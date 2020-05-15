@@ -1,18 +1,134 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:padding="10dp"
     tools:context=".MainActivity">
 
+    <Button
+        android:id="@+id/btnSpremiFotografiju"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Spremi fotografiju"
+        android:layout_centerHorizontal="true"
+        android:background="@color/colorPrimaryDark"
+        android:textColor="@color/colorWhite"
+        >
+    </Button>
+
     <TextView
+        android:id="@+id/geosirina"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_below="@+id/btnSpremiFotografiju"
+        android:text="Geografska širina: "
+        android:textSize="16sp"
+        >
+    </TextView>
+    <TextView
+        android:id="@+id/mygeosirina"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/btnSpremiFotografiju"
+        android:layout_toEndOf="@id/geosirina"
+        tools:text="Geografska širina: "
+        android:textSize="16sp"
+        android:layout_toRightOf="@id/geosirina">
+    </TextView>
+    <TextView
+        android:id="@+id/geoduzina"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/geosirina"
+        android:text="Geografska širina: "
+        android:textSize="16sp"
+        >
+    </TextView>
+    <TextView
+        android:id="@+id/mygeoduzina"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/geosirina"
+        tools:text="Geografska širina: "
+        android:textSize="16sp"
+        android:layout_toRightOf="@id/geoduzina"
+        android:layout_toEndOf="@id/geoduzina">
+    </TextView>
+    <TextView
+        android:id="@+id/drzava"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/geoduzina"
+        android:text="Država: "
+        android:textSize="16sp"
+        >
+    </TextView>
+    <TextView
+        android:id="@+id/mydrzava"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/geoduzina"
+        android:layout_toEndOf="@+id/drzava"
+        tools:text="Država: "
+        android:textSize="16sp"
+        android:layout_toRightOf="@+id/drzava">
+    </TextView>
+    <TextView
+        android:id="@+id/mjesto"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/drzava"
+        android:text="Mjesto: "
+        android:textSize="16sp"
+        >
+    </TextView>
+    <TextView
+        android:id="@+id/mymjesto"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/drzava"
+        android:layout_toEndOf="@id/mjesto"
+        tools:text="Mjesto: "
+        android:textSize="16sp"
+        android:layout_toRightOf="@id/mjesto">
+    </TextView>
+    <TextView
+        android:id="@+id/adresa"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/mjesto"
+        android:text="Adresa: "
+        android:textSize="16sp"
+        >
+    </TextView>
+    <TextView
+        android:id="@+id/myadresa"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/mjesto"
+        tools:text="Adresa: "
+        android:layout_toEndOf="@+id/adresa"
+        android:textSize="16sp"
+        android:layout_toRightOf="@+id/adresa">
+    </TextView>
+    <Button
+        android:id="@+id/trackLocationAction"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/adresa"
+        android:text="track Location"/>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        xmlns:map="http://schemas.android.com/apk/res-auto"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/trackLocationAction"
+        android:id="@+id/map"
+        tools:context=".MapsActivity"
+        android:name="com.google.android.gms.maps.SupportMapFragment"/>
+
+</RelativeLayout>
