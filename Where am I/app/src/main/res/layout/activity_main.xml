@@ -12,7 +12,7 @@
         android:id="@+id/btnSpremiFotografiju"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Spremi fotografiju"
+        android:text="Snimi fotografiju"
         android:layout_centerHorizontal="true"
         android:background="@color/colorPrimaryDark"
         android:textColor="@color/colorWhite"

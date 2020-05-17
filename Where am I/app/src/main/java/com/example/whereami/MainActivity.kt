@@ -45,15 +45,14 @@ import java.io.*
 import java.nio.file.Files.createFile
 import java.text.SimpleDateFormat
 import javax.xml.xpath.XPathConstants.STRING
+import java.io.ByteArrayOutputStream as ByteArrayOutputStream1
 
 
 @Suppress("DEPRECATION")
 class MainActivity : AppCompatActivity(), OnMapReadyCallback,
     ActivityCompat.OnRequestPermissionsResultCallback{
 
-    private lateinit var mSoundPool: SoundPool
-    private var mLoaded: Boolean = false
-    var mSoundMap: HashMap<Int, Int> = HashMap()
+    private var sound : Sound = Sound()
 
     private val locationPermission = Manifest.permission.ACCESS_FINE_LOCATION
     private val locationRequestCode = 10
@@ -61,6 +60,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
     private lateinit var geocoder: Geocoder
     private lateinit var address :  MutableList<Address>
     private lateinit var map: GoogleMap
+    private lateinit var fname : String
 
     val REQUEST_IMAGE_CAPTURE = 1
     private val PERMISSION_REQUEST_CODE: Int = 101
@@ -70,11 +70,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        sound.loadSounds()
+
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
-
-        this.loadSounds()
 
         this.trackLocation()
 
@@ -114,6 +114,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         mymjesto.text = address[0].locality
         myadresa.text =address[0].thoroughfare+ " " +address[0].subThoroughfare;
 
+        fname=address[0].getAddressLine(0)
         changeMapView(lat,lon,address[0].getAddressLine(0))
     }
 
@@ -124,20 +125,31 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         map.uiSettings.isZoomControlsEnabled = true
     }
 
-
     private fun displaySaveImageNotificaiton() {
-        val intent = Intent(this, MainActivity::class.java)
-        // We can put extra in the intent.
+        val file = File(mCurrentPhotoPath)
+        val uri = Uri.fromFile(file)
+
+        val intent = Intent(Intent.ACTION_VIEW) //
+            .setDataAndType(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) FileProvider.getUriForFile(
+                    WhereAmI.ApplicationContext,
+                    "com.example.android.fileprovider",
+                    file!!
+                ) else Uri.fromFile(file),
+                "image/*"
+            ).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
             intent,
-            PendingIntent.FLAG_CANCEL_CURRENT
+            0
         )
         val notification = NotificationCompat.Builder(this, getChannelId(CHANNEL_LIKES))
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Screenshot!")
-            .setContentText("You did screenshot.")
+            .setContentTitle("You took the photo!")
+            .setContentText(fname)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
@@ -147,16 +159,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
 
     override fun onMapReady(googleMap: GoogleMap) {
         map = googleMap
-        setMapLongClick(map)
+        setMapClick(map)
     }
-    private fun setMapLongClick(map:GoogleMap) {
+    private fun setMapClick(map:GoogleMap) {
         map.setOnMapClickListener { latLng ->
             map.addMarker(
                 MarkerOptions()
                     .position(latLng)
                     .icon(BitmapDescriptorFactory.fromResource(R.mipmap.marker))
             )
-            playSound()
+            sound.playSound()
         }
     }
 
@@ -194,8 +206,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
             else -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         }
     }
-    private fun takePicture() {
 
+    private fun takePicture() {
         val intent: Intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
         val file: File = createFile()
 
@@ -208,23 +220,23 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         startActivityForResult(intent, REQUEST_IMAGE_CAPTURE)
 
     }
+
     @SuppressLint("MissingSuperCall")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
 
             //To get the File for further usage
             val auxFile = File(mCurrentPhotoPath)
+            var bitmap :Bitmap=BitmapFactory.decodeFile(mCurrentPhotoPath)
 
-
-            var bitmap: Bitmap = BitmapFactory.decodeFile(mCurrentPhotoPath)
-
+            displaySaveImageNotificaiton()
         }
     }
 
     private fun checkPersmission(): Boolean {
-        return (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) ==
+        return (ContextCompat.checkSelfPermission(this, CAMERA) ==
                 PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this,
-            android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
+            READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
     }
 
     private fun requestPermission() {
@@ -233,6 +245,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
 
     @Throws(IOException::class)
     private fun createFile(): File {
+
         // Create an image file name
         val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
         val storageDir: File? = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
@@ -245,6 +258,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
             mCurrentPhotoPath = absolutePath
         }
     }
+
     private fun startTrackingLocation() {
         Log.d("TAG", "Tracking location")
         val criteria: Criteria = Criteria()
@@ -264,8 +278,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         locationManager.removeUpdates(locationListener)
     }
 
-
-    private fun loadSounds() {
+    /*private fun loadSounds() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             this.mSoundPool = SoundPool.Builder().setMaxStreams(10).build()
         } else {
@@ -278,5 +291,5 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
     fun playSound() {
         val soundID = this.mSoundMap[R.raw.marker] ?: 0
         this.mSoundPool.play(soundID, 1f, 1f, 1, 0, 1f)
-    }
+    }*/
 }
