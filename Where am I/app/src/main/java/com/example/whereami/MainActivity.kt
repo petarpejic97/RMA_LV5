@@ -15,52 +15,40 @@ import android.util.Log
 import android.widget.Toast
 import kotlinx.android.synthetic.main.activity_main.*
 import android.location.Geocoder
-import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import java.util.*
 import android.graphics.Bitmap
 import android.os.Environment
-import android.os.Environment.getExternalStorageDirectory
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.drawable.Drawable
-import android.media.AudioManager
-import android.media.SoundPool
 import android.net.Uri
 import android.os.Build
-import android.os.Environment.getRootDirectory
 import android.provider.MediaStore
-import android.view.View
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import com.google.android.gms.maps.model.*
 import java.io.*
-import java.nio.file.Files.createFile
 import java.text.SimpleDateFormat
-import javax.xml.xpath.XPathConstants.STRING
-import java.io.ByteArrayOutputStream as ByteArrayOutputStream1
 
 
 @Suppress("DEPRECATION")
 class MainActivity : AppCompatActivity(), OnMapReadyCallback,
     ActivityCompat.OnRequestPermissionsResultCallback{
 
-    private var sound : Sound = Sound()
+    private var soundManager : SoundManager = SoundManager()
+
+    private lateinit var notificationManager : NotificationManager
 
     private val locationPermission = Manifest.permission.ACCESS_FINE_LOCATION
     private val locationRequestCode = 10
     private lateinit var locationManager: LocationManager
     private lateinit var geocoder: Geocoder
     private lateinit var address :  MutableList<Address>
-    private lateinit var map: GoogleMap
-    private lateinit var fname : String
+    private lateinit var mapController : MapController
 
     val REQUEST_IMAGE_CAPTURE = 1
     private val PERMISSION_REQUEST_CODE: Int = 101
@@ -70,7 +58,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        sound.loadSounds()
+        soundManager.loadSounds()
 
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
@@ -114,63 +102,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         mymjesto.text = address[0].locality
         myadresa.text =address[0].thoroughfare+ " " +address[0].subThoroughfare;
 
-        fname=address[0].getAddressLine(0)
-        changeMapView(lat,lon,address[0].getAddressLine(0))
+        mapController.changeMapView(lat,lon,address[0].getAddressLine(0))
     }
 
-    private fun changeMapView(lat : Double, lon : Double,address : String){
-        val mylocation = LatLng(lat,lon)
-        map.addMarker(MarkerOptions().position(mylocation).title(address))
-        map.moveCamera(CameraUpdateFactory.newLatLngZoom(mylocation, 10.0f))
-        map.uiSettings.isZoomControlsEnabled = true
-    }
 
-    private fun displaySaveImageNotificaiton() {
-        val file = File(mCurrentPhotoPath)
-        val uri = Uri.fromFile(file)
-
-        val intent = Intent(Intent.ACTION_VIEW) //
-            .setDataAndType(
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) FileProvider.getUriForFile(
-                    WhereAmI.ApplicationContext,
-                    "com.example.android.fileprovider",
-                    file!!
-                ) else Uri.fromFile(file),
-                "image/*"
-            ).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-
-
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            intent,
-            0
-        )
-        val notification = NotificationCompat.Builder(this, getChannelId(CHANNEL_LIKES))
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("You took the photo!")
-            .setContentText(fname)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .build()
-        NotificationManagerCompat.from(this)
-            .notify(1001, notification)
-    }
 
     override fun onMapReady(googleMap: GoogleMap) {
-        map = googleMap
-        setMapClick(map)
+        mapController = MapController(googleMap)
+
+        mapController.setMapClick(soundManager)
     }
-    private fun setMapClick(map:GoogleMap) {
-        map.setOnMapClickListener { latLng ->
-            map.addMarker(
-                MarkerOptions()
-                    .position(latLng)
-                    .icon(BitmapDescriptorFactory.fromResource(R.mipmap.marker))
-            )
-            sound.playSound()
-        }
-    }
+
 
     private fun trackLocation() {
         if(hasPermissionCompat(locationPermission)){
@@ -224,12 +166,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
     @SuppressLint("MissingSuperCall")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
+            notificationManager = mCurrentPhotoPath?.let { NotificationManager(it) }!!
 
-            //To get the File for further usage
-            val auxFile = File(mCurrentPhotoPath)
-            var bitmap :Bitmap=BitmapFactory.decodeFile(mCurrentPhotoPath)
+            notificationManager.setNotificationTitle(address[0].getAddressLine(0))
 
-            displaySaveImageNotificaiton()
+            notificationManager.displaySaveImageNotificaiton()
         }
     }
 
@@ -245,7 +186,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
 
     @Throws(IOException::class)
     private fun createFile(): File {
-
         // Create an image file name
         val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
         val storageDir: File? = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
@@ -277,19 +217,4 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         super.onPause()
         locationManager.removeUpdates(locationListener)
     }
-
-    /*private fun loadSounds() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            this.mSoundPool = SoundPool.Builder().setMaxStreams(10).build()
-        } else {
-            this.mSoundPool = SoundPool(10, AudioManager.STREAM_MUSIC, 0)
-        }
-        this.mSoundPool.setOnLoadCompleteListener { _, _, _ -> mLoaded = true }
-        this.mSoundMap[R.raw.marker] = this.mSoundPool.load(this, R.raw.marker, 1)
-    }
-
-    fun playSound() {
-        val soundID = this.mSoundMap[R.raw.marker] ?: 0
-        this.mSoundPool.play(soundID, 1f, 1f, 1, 0, 1f)
-    }*/
 }

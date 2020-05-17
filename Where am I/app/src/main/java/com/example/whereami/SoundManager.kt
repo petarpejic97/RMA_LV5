@@ -5,12 +5,12 @@ import android.media.SoundPool
 import android.os.Build
 import java.util.HashMap
 
-class Sound {
+class SoundManager {
     private lateinit var mSoundPool: SoundPool
     private var mLoaded: Boolean = false
     var mSoundMap: HashMap<Int, Int> = HashMap()
 
-     fun loadSounds() {
+    fun loadSounds() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             this.mSoundPool = SoundPool.Builder().setMaxStreams(10).build()
         } else {
