@@ -1,7 +1,11 @@
 package com.example.whereami
 
 import android.Manifest
+import android.Manifest.permission.CAMERA
+import android.Manifest.permission.READ_EXTERNAL_STORAGE
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.*
@@ -15,19 +19,74 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MarkerOptions
 import java.util.*
+import android.graphics.Bitmap
+import android.os.Environment
+import android.os.Environment.getExternalStorageDirectory
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.Drawable
+import android.media.AudioManager
+import android.media.SoundPool
+import android.net.Uri
+import android.os.Build
+import android.os.Environment.getRootDirectory
+import android.provider.MediaStore
+import android.view.View
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import com.google.android.gms.maps.model.*
+import java.io.*
+import java.nio.file.Files.createFile
+import java.text.SimpleDateFormat
+import javax.xml.xpath.XPathConstants.STRING
 
 
-class MainActivity : AppCompatActivity(), OnMapReadyCallback {
+@Suppress("DEPRECATION")
+class MainActivity : AppCompatActivity(), OnMapReadyCallback,
+    ActivityCompat.OnRequestPermissionsResultCallback{
+
+    private lateinit var mSoundPool: SoundPool
+    private var mLoaded: Boolean = false
+    var mSoundMap: HashMap<Int, Int> = HashMap()
 
     private val locationPermission = Manifest.permission.ACCESS_FINE_LOCATION
     private val locationRequestCode = 10
     private lateinit var locationManager: LocationManager
     private lateinit var geocoder: Geocoder
+    private lateinit var address :  MutableList<Address>
     private lateinit var map: GoogleMap
 
+    val REQUEST_IMAGE_CAPTURE = 1
+    private val PERMISSION_REQUEST_CODE: Int = 101
+    private var mCurrentPhotoPath: String? = null;
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
+        mapFragment.getMapAsync(this)
+
+        this.loadSounds()
+
+        this.trackLocation()
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) createNotificationChannels()
+
+        btnSpremiFotografiju.setOnClickListener {
+            if(checkPersmission())
+                takePicture()
+            else
+                requestPermission()
+        }
+    }
     private val locationListener = object: LocationListener {
         override fun onProviderEnabled(provider: String?) { }
         override fun onProviderDisabled(provider: String?) { }
@@ -45,32 +104,62 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         mygeoduzina.text = "$lon"
 
         setAddress(lat,lon)
-
     }
+
     @SuppressLint("SetTextI18n")
     private fun setAddress(lat : Double, lon : Double){
         geocoder = Geocoder(baseContext, Locale.getDefault())
-        val adress = geocoder.getFromLocation(lat,lon,1)
-        mydrzava.text = adress[0].countryName
-        mymjesto.text = adress[0].locality
-        myadresa.text =adress[0].thoroughfare+ " " +adress[0].subThoroughfare;
+        address = geocoder.getFromLocation(lat,lon,1)
+        mydrzava.text = address[0].countryName
+        mymjesto.text = address[0].locality
+        myadresa.text =address[0].thoroughfare+ " " +address[0].subThoroughfare;
+
+        changeMapView(lat,lon,address[0].getAddressLine(0))
     }
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        trackLocationAction.setOnClickListener{ trackLocation() }
-        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
-        mapFragment.getMapAsync(this)
+
+    private fun changeMapView(lat : Double, lon : Double,address : String){
+        val mylocation = LatLng(lat,lon)
+        map.addMarker(MarkerOptions().position(mylocation).title(address))
+        map.moveCamera(CameraUpdateFactory.newLatLngZoom(mylocation, 10.0f))
+        map.uiSettings.isZoomControlsEnabled = true
     }
+
+
+    private fun displaySaveImageNotificaiton() {
+        val intent = Intent(this, MainActivity::class.java)
+        // We can put extra in the intent.
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_CANCEL_CURRENT
+        )
+        val notification = NotificationCompat.Builder(this, getChannelId(CHANNEL_LIKES))
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Screenshot!")
+            .setContentText("You did screenshot.")
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+        NotificationManagerCompat.from(this)
+            .notify(1001, notification)
+    }
+
     override fun onMapReady(googleMap: GoogleMap) {
         map = googleMap
-        val osijek = LatLng(45.55111, 18.69389)
-        map.addMarker(MarkerOptions().position(osijek).title("Marker in Osijek"))
-        map.mapType = GoogleMap.MAP_TYPE_SATELLITE
-        map.uiSettings.isZoomControlsEnabled = true
-        map.moveCamera(CameraUpdateFactory.newLatLng(osijek))
+        setMapLongClick(map)
     }
+    private fun setMapLongClick(map:GoogleMap) {
+        map.setOnMapClickListener { latLng ->
+            map.addMarker(
+                MarkerOptions()
+                    .position(latLng)
+                    .icon(BitmapDescriptorFactory.fromResource(R.mipmap.marker))
+            )
+            playSound()
+        }
+    }
+
     private fun trackLocation() {
         if(hasPermissionCompat(locationPermission)){
             startTrackingLocation()
@@ -78,6 +167,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             requestPermisionCompat(arrayOf(locationPermission), locationRequestCode)
         }
     }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -89,7 +179,70 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 else
                     Toast.makeText(this, "permision denied", Toast.LENGTH_SHORT).show()
             }
+
+            PERMISSION_REQUEST_CODE->{
+                if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)
+                    && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+
+                    takePicture()
+
+                } else {
+                    Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show()
+                }
+                return
+            }
             else -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        }
+    }
+    private fun takePicture() {
+
+        val intent: Intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        val file: File = createFile()
+
+        val uri: Uri = FileProvider.getUriForFile(
+            this,
+            "com.example.android.fileprovider",
+            file
+        )
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, uri)
+        startActivityForResult(intent, REQUEST_IMAGE_CAPTURE)
+
+    }
+    @SuppressLint("MissingSuperCall")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
+
+            //To get the File for further usage
+            val auxFile = File(mCurrentPhotoPath)
+
+
+            var bitmap: Bitmap = BitmapFactory.decodeFile(mCurrentPhotoPath)
+
+        }
+    }
+
+    private fun checkPersmission(): Boolean {
+        return (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this,
+            android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
+    }
+
+    private fun requestPermission() {
+        ActivityCompat.requestPermissions(this, arrayOf(READ_EXTERNAL_STORAGE, CAMERA), PERMISSION_REQUEST_CODE)
+    }
+
+    @Throws(IOException::class)
+    private fun createFile(): File {
+        // Create an image file name
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+        val storageDir: File? = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        return File.createTempFile(
+            "JPEG_${timeStamp}_", /* prefix */
+            ".jpg", /* suffix */
+            storageDir /* directory */
+        ).apply {
+            // Save a file: path for use with ACTION_VIEW intents
+            mCurrentPhotoPath = absolutePath
         }
     }
     private fun startTrackingLocation() {
@@ -105,9 +258,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             Toast.makeText(this, "permision denied", Toast.LENGTH_SHORT).show()
         }
     }
+
     override fun onPause() {
         super.onPause()
         locationManager.removeUpdates(locationListener)
     }
 
+
+    private fun loadSounds() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            this.mSoundPool = SoundPool.Builder().setMaxStreams(10).build()
+        } else {
+            this.mSoundPool = SoundPool(10, AudioManager.STREAM_MUSIC, 0)
+        }
+        this.mSoundPool.setOnLoadCompleteListener { _, _, _ -> mLoaded = true }
+        this.mSoundMap[R.raw.marker] = this.mSoundPool.load(this, R.raw.marker, 1)
+    }
+
+    fun playSound() {
+        val soundID = this.mSoundMap[R.raw.marker] ?: 0
+        this.mSoundPool.play(soundID, 1f, 1f, 1, 0, 1f)
+    }
 }
