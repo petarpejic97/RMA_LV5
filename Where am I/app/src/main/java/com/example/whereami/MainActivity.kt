@@ -174,12 +174,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         }
     }
 
-    private fun checkPersmission(): Boolean {
-        return (ContextCompat.checkSelfPermission(this, CAMERA) ==
-                PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this,
-            READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
-    }
-
     private fun requestPermission() {
         ActivityCompat.requestPermissions(this, arrayOf(READ_EXTERNAL_STORAGE, CAMERA), PERMISSION_REQUEST_CODE)
     }

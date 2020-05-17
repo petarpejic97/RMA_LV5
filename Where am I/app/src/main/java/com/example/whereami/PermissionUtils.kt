@@ -1,5 +1,7 @@
 package com.example.whereami
 
+import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -15,7 +17,7 @@ fun AppCompatActivity.requestPermisionCompat(permission: Array<String>, requestC
     ActivityCompat.requestPermissions(this, permission, requestCode)
 }
 fun AppCompatActivity.checkPersmission(): Boolean {
-    return (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) ==
+    return (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this,
-        android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
+        Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
 }
